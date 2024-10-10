@@ -38,7 +38,7 @@ class DdCma:
     """
     
     def __init__(self, xmean0, sigma0, 
-                 lam=None,
+                 lam=3,
                  flg_covariance_update=None,
                  flg_variance_update=None,
                  flg_active_update=True,
@@ -249,11 +249,13 @@ class DdCma:
 
         # evaluation
         #----------------------------------------------------------------------------------------------------------------------------------------
-        arf_list, self.best_f = func(arx, self.best_f)    
+        arf_list = func(arx)    
         #----------------------------------------------------------------------------------------------------------------------------------------
         arf = np.array(arf_list)
+        #----------------------------------------------------------------------------------------------------------------------------------------
+
         # print("Obj:",arf)
-        # cma_log2csv(arf, filename="J_2")
+        cma_log2csv(arf,"log/cma/", filename="Obj")
         
         # arf = func(arx)
         self.neval += len(arf)
@@ -414,7 +416,7 @@ class Checker:
 
 class Logger:
     """Logger for dd-CMA"""
-    def __init__(self, cma, prefix='log/cma/pattern1', variable_list=['xmean', 'D', 'S', 'sigma', 'beta']):
+    def __init__(self, cma, prefix='log/cma/', variable_list=['xmean', 'D', 'S', 'sigma', 'beta']):
         """
         Parameters
         ----------
@@ -430,11 +432,11 @@ class Logger:
         self.prefix = prefix
         self.variable_list = variable_list
         self.logger = dict()
-        self.fmin_logger = self.prefix + '_fmin.dat'
+        self.fmin_logger = self.prefix + 'fmin.dat'
         with open(self.fmin_logger, 'w') as f:
             f.write('#' + type(self).__name__ + "\n")
         for key in self.variable_list:
-            self.logger[key] = self.prefix + '_' + key + '.dat'
+            self.logger[key] = self.prefix + key + '.dat'
             with open(self.logger[key], 'w') as f:
                 f.write('#' + type(self).__name__ + "\n")
                 
@@ -462,6 +464,7 @@ class Logger:
             if isinstance(var, np.ndarray) and len(var.shape) > 1:
                 var = var.flatten()
             varlist = np.hstack((t, neval, var))
+            varlist = varlist.tolist()
             with open(log, 'a') as f:
                 f.write(' '.join(map(repr, varlist)) + "\n")
 
@@ -552,6 +555,8 @@ class Logger:
         for key in variable_list:
             idx += 1
             x = np.loadtxt(prefix + '_' + key + '.dat')
+            # x = np.genfromtxt(prefix + '_' + key + '.dat',dtype=None)
+
             x = x[~np.isnan(
                 x[:, xaxis]), :]  # remove columns where xaxis is nan
             ax = plt.subplot(nrows, ncols, idx)
@@ -624,75 +629,75 @@ def mirror(z, lbound, ubound, flg_periodic):
 
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    # Ellipsoid-Cigar function
-    # m = 21
-    # N = 2*m+1
-    N = 31
-    def ellcig(x):
-        cig = np.ones(x.shape[1]) / np.sqrt(x.shape[1])
-        d = np.logspace(0, 3, base=10, num=x.shape[1], endpoint=True)
-        y = x * d
-        f = 1e4 * np.sum(y ** 2, axis=1) + (1. - 1e4) * np.dot(y, cig)**2
-        return f
+#     # Ellipsoid-Cigar function
+#     # m = 21
+#     # N = 2*m+1
+#     N = 62
+#     def ellcig(x):
+#         cig = np.ones(x.shape[1]) / np.sqrt(x.shape[1])
+#         d = np.logspace(0, 3, base=10, num=x.shape[1], endpoint=True)
+#         y = x * d
+#         f = 1e4 * np.sum(y ** 2, axis=1) + (1. - 1e4) * np.dot(y, cig)**2
+#         return f
     
-    # Support for box constraint and periodic variables
-    # Set np.nan, -np.inf or np.inf if no bound
-    LOWER_BOUND = -5.0 * np.ones(N)
-    UPPER_BOUND = 5.0 * np.ones(N)
-    FLAG_PERIODIC = np.asarray([False] * N)
-    period_length = (UPPER_BOUND - LOWER_BOUND) * 2.0
-    period_length[FLAG_PERIODIC] /= 2.0
-    period_length[np.logical_not(np.isfinite(period_length))] = np.inf
+#     # Support for box constraint and periodic variables
+#     # Set np.nan, -np.inf or np.inf if no bound
+#     LOWER_BOUND = -5.0 * np.ones(N)
+#     UPPER_BOUND = 5.0 * np.ones(N)
+#     FLAG_PERIODIC = np.asarray([False] * N)
+#     period_length = (UPPER_BOUND - LOWER_BOUND) * 2.0
+#     period_length[FLAG_PERIODIC] /= 2.0
+#     period_length[np.logical_not(np.isfinite(period_length))] = np.inf
     
-    def fobj(x):
-        xx = mirror(x, LOWER_BOUND, UPPER_BOUND, FLAG_PERIODIC)
-        return ellcig(xx)
+#     def fobj(x):
+#         xx = mirror(x, LOWER_BOUND, UPPER_BOUND, FLAG_PERIODIC)
+#         return ellcig(xx)
     
-    # Setting for resart
-    NUM_RESTART = 10  # number of restarts with increased population size
-    MAX_NEVAL = 1e6   # maximal number of f-calls
-    F_TARGET = 1e-8   # target function value
-    total_neval = 0   # total number of f-calls
+#     # Setting for resart
+#     NUM_RESTART = 10  # number of restarts with increased population size
+#     MAX_NEVAL = 1e6   # maximal number of f-calls
+#     F_TARGET = 1e-8   # target function value
+#     total_neval = 0   # total number of f-calls
     
-    # Main loop
-    ddcma = DdCma(xmean0=np.random.randn(N), sigma0=np.ones(N)*2.)
-    ddcma.upper_bounding_coordinate_std(period_length)
-    checker = Checker(ddcma)
-    logger = Logger(ddcma)
-    for restart in range(NUM_RESTART):        
-        issatisfied = False
-        fbestsofar = np.inf
-        while not issatisfied:
-            ddcma.onestep(func=fobj)
-            ddcma.upper_bounding_coordinate_std(period_length)
-            fbest = np.min(ddcma.arf)
-            fbestsofar = min(fbest, fbestsofar)
-            if fbest <= F_TARGET:
-                issatisfied, condition = True, 'ftarget'
-            else:
-                issatisfied, condition = checker()
-            if ddcma.t % 10 == 0:
-                print(ddcma.t, ddcma.neval, fbest, fbestsofar)
-                logger()
-        logger(condition)
-        print("Terminated with condition: " + str(condition))
-        # For restart
-        total_neval += ddcma.neval
-        if total_neval < MAX_NEVAL and fbest > F_TARGET:
-            popsize = ddcma.lam * 2
-            ddcma = DdCma(xmean0=np.random.randn(N), sigma0=np.ones(N)*2., lam=popsize)
-            checker = Checker(ddcma)
-            logger.setcma(ddcma)
-            print("Restart with popsize: " + str(ddcma.lam))
-        else:
-            break
+#     # Main loop
+#     ddcma = DdCma(xmean0=np.random.randn(N), sigma0=np.ones(N)*2.)
+#     ddcma.upper_bounding_coordinate_std(period_length)
+#     checker = Checker(ddcma)
+#     logger = Logger(ddcma)
+#     for restart in range(NUM_RESTART):        
+#         issatisfied = False
+#         fbestsofar = np.inf
+#         while not issatisfied:
+#             ddcma.onestep(func=fobj)
+#             ddcma.upper_bounding_coordinate_std(period_length)
+#             fbest = np.min(ddcma.arf)
+#             fbestsofar = min(fbest, fbestsofar)
+#             if fbest <= F_TARGET:
+#                 issatisfied, condition = True, 'ftarget'
+#             else:
+#                 issatisfied, condition = checker()
+#             if ddcma.t % 10 == 0:
+#                 print(ddcma.t, ddcma.neval, fbest, fbestsofar)
+#                 logger()
+#         logger(condition)
+#         print("Terminated with condition: " + str(condition))
+#         # For restart
+#         total_neval += ddcma.neval
+#         if total_neval < MAX_NEVAL and fbest > F_TARGET:
+#             popsize = ddcma.lam * 2
+#             ddcma = DdCma(xmean0=np.random.randn(N), sigma0=np.ones(N)*2., lam=popsize)
+#             checker = Checker(ddcma)
+#             logger.setcma(ddcma)
+#             print("Restart with popsize: " + str(ddcma.lam))
+#         else:
+#             break
 
-    # Produce a figure
-    fig, axdict = logger.plot()
-    for key in axdict:
-        if key not in ('xmean'):
-            axdict[key].set_yscale('log')
-    plt.tight_layout()
-    plt.savefig(logger.prefix + '.pdf')
+#     # Produce a figure
+#     fig, axdict = logger.plot()
+#     for key in axdict:
+#         if key not in ('xmean'):
+#             axdict[key].set_yscale('log')
+#     plt.tight_layout()
+#     plt.savefig(logger.prefix + '.pdf')

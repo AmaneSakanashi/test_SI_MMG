@@ -13,7 +13,7 @@ def font_setting():
     plt.rcParams["figure.subplot.wspace"] = 0.20
     plt.rcParams["figure.subplot.hspace"] = 0.20  # Vertical spacing of figure
 
-    plt.rcParams["font.family"] = "serif"       # Font
+    plt.rcParams["font.family"] = "Times New Roman"       # Font
     plt.rcParams["font.serif"] = "Times New Roman"
     plt.rcParams["font.size"] = 16              # Basic size of font
     plt.rcParams["mathtext.cal"] = "serif"      # Font for TeX

@@ -1,79 +1,14 @@
-from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import mmg_esso
-
-esso_dir = Path(__file__).parents[1]
-
-
-class EssoOsakaMMG(object):
+class UpdateParam:
     def __init__(self):
-        self.set_principal_particulars()
-        # self.set_mmg_model_parameter_mean()
-        # self.set_mmg_model_parameter_var()
-        self.set_mmg_model_parameter()
-    
+        self.mean_result = pd.read_csv("log/cma/mean_result.csv", header=None)
+        self.var_result = pd.read_csv("log/cma/var_result.csv", header=None)
 
-    def set_principal_particulars(self):
-        # set principal parameters
-        principal_particulars = pd.read_csv(
-            "inputfiles/principal_particulars_EssoOsaka3m.csv",
-            header=0,
-            index_col=0,
-        )
-        #
-        self.pp_vector = np.empty(24)
-        ### Principal Particulars ###
-        self.pp_vector[0] = principal_particulars.at["lpp", "value"]
-        self.pp_vector[1] = principal_particulars.at["breadth", "value"]
-        self.pp_vector[2] = principal_particulars.at["draft", "value"]
-        self.pp_vector[3] = principal_particulars.at["mass_nd", "value"]
-        self.pp_vector[4] = principal_particulars.at["x_lcg", "value"]
-        # Propeller
-        self.pp_vector[5] = principal_particulars.at["dia_prop", "value"]
-        self.pp_vector[6] = principal_particulars.at["pitchr", "value"]
-        # Rudder
-        self.pp_vector[7] = principal_particulars.at["area_rudder", "value"]
-        self.pp_vector[8] = principal_particulars.at["lambda_rudder", "value"]
-        self.pp_vector[9] = principal_particulars.at["x_location_rudder", "value"]
-        # Side thrusters
-        self.pp_vector[10] = principal_particulars.at["D_bthrust", "value"]
-        self.pp_vector[11] = principal_particulars.at["D_sthrust", "value"]
-        self.pp_vector[12] = principal_particulars.at["x_bowthrust_loc", "value"]
-        self.pp_vector[13] = principal_particulars.at["x_stnthrust_loc", "value"]
-        self.pp_vector[14] = principal_particulars.at["Thruster_speed_max", "value"]
-        # parameters for wind force computation
-        self.pp_vector[15] = principal_particulars.at[
-            "area_projected_trans", "value"
-        ]  # AT
-        self.pp_vector[16] = principal_particulars.at[
-            "area_projected_lateral", "value"
-        ]  # AL
-        self.pp_vector[17] = principal_particulars.at["AOD", "value"]  # AOD
-        self.pp_vector[18] = principal_particulars.at[
-            "LCW", "value"
-        ]  # C or LCW, midship to center of AL
-        self.pp_vector[19] = principal_particulars.at[
-            "LCBR", "value"
-        ]  # CBR, midship to center of AOD(superstructure or bridge)
-        self.pp_vector[20] = principal_particulars.at[
-            "HBR", "value"
-        ]  #  Height from free surface to top of the superstructure (bridge) (m)
-        self.pp_vector[21] = principal_particulars.at[
-            "HC", "value"
-        ]  # Hc, hight of center of lateral projected area
-        self.pp_vector[22] = principal_particulars.at[
-            "SBW", "value"
-        ]  # ship breadth fro wind force computation
-        self.pp_vector[23] = principal_particulars.at[
-            "Lz", "value"
-        ]  # Lz --- Acting position of sway force from center of gravity (it is necessary to calculate roll moment)
-
-    def set_mmg_model_parameter(self):
-        # set mmg parameter
+        self.output_path = "log/sim_data/"
         parameter_init = pd.read_csv(
-            "inputfiles/MMG_params_EssoOsaka3m_mean_lim.csv", header=0, index_col=0
+            "inputfiles/MMG_params_EssoOsaka3m.csv", header=0, index_col=0
         )
         #
         self.mmg_params_vector = np.empty(len(parameter_init))
@@ -169,32 +104,91 @@ class EssoOsakaMMG(object):
         self.mmg_params_vector[67] = parameter_init.at["NN2", "value"]
         self.mmg_params_vector[68] = parameter_init.at["NN3", "value"]
 
-    def ode_rhs(self,x, u, w, update_params):
-        ### To prevent read-only erro in ray
-        self.mmg_params_vector = self.mmg_params_vector.copy()
+    def update(self):           
+            m_params = np.array(self.mean_result.values.flatten())
+            v_params = np.array(self.var_result.values.flatten())  
+
+            update_params = np.random.normal(m_params, v_params)
+
+            update_index = np.array([4,5,6,7,8,9,10,11,
+                            13,
+                            22,23,24,25,26,27,28,29,
+                            30,31,32,33,34,35,36,37,
+                            38,39,40,41,
+                            49,51])
+
+            update_mmg_params = self.mmg_params_vector
+
+            for i in range(31):
+                update_mmg_params[update_index[i]] = update_params[i]
+
+            return update_mmg_params
         
-        ### To degug, comment-out below ###
-        update_index = np.array([4,5,6,7,8,9,10,11,
-                        13,
-                        22,23,24,25,26,27,28,29,
-                        30,31,32,33,34,35,36,37,
-                        38,39,40,41,
-                        49,51])
-        for i in range(31):
-            self.mmg_params_vector[update_index[i]] = update_params[i]
+    def setParams(self, mmg_params_vector):
+        """ update parameters (hydro derivatives etc) of MMG model
         
-        [delta_rudder, n_prop, n_bt, n_st] = u
-        [Wind_velocity, Wind_Direction] = w
-        # print("MMG_pamams : ", self.mmg_params_vector)
-        dx = mmg_esso.esso_osaka_vector_input.mmg_lowspeed_model(
-            x,
-            delta_rudder,
-            n_prop,
-            n_bt,
-            n_st,
-            Wind_Direction,
-            Wind_velocity,
-            self.pp_vector,
-            self.mmg_params_vector,
-        )
-        return dx
+        Args:
+            parameter(dataflaminputfiles/principal_particulars_EssoOsaka3m.csv
+        """
+        self.MassX_nd      = mmg_params_vector[0] 
+        self.MassY_nd      = mmg_params_vector[1] 
+        self.IJzz_nd       = mmg_params_vector[2]
+        # Hull
+        self.Xuu_nd        = mmg_params_vector[3] 
+        self.Xvr_nd        = mmg_params_vector[4]
+        self.Yv_nd         = mmg_params_vector[5]
+        self.Yr_nd         = mmg_params_vector[6]
+        self.Nv_nd         = mmg_params_vector[7] 
+        self.Nr_nd         = mmg_params_vector[8]
+        self.CD            = mmg_params_vector[9]#0.500
+        self.C_rY          = mmg_params_vector[10] #1.00
+        self.C_rN          = mmg_params_vector[11] #0.50
+        self.X_0F_nd       = self.Xuu_nd
+        self.X_0A_nd       = mmg_params_vector[12]
+        # Propeller
+        self.t_prop        = mmg_params_vector[13] 
+        self.wP0           = mmg_params_vector[14]  
+        self.tau           = mmg_params_vector[15]
+        self.CP_nd         = mmg_params_vector[16] 
+        self.xP_nd         = mmg_params_vector[17] 
+        self.kt_coeff      = np.array([mmg_params_vector[18], mmg_params_vector[19], 
+                                        mmg_params_vector[20]]) 
+        self.Ai            = np.array([mmg_params_vector[21], mmg_params_vector[22], 
+                                        mmg_params_vector[23], mmg_params_vector[24],
+                                        mmg_params_vector[25], mmg_params_vector[26],
+                                        mmg_params_vector[27], mmg_params_vector[28]]) 
+        self.Bi            = np.array([mmg_params_vector[29], mmg_params_vector[30], 
+                                        mmg_params_vector[31], mmg_params_vector[32],
+                                        mmg_params_vector[33], mmg_params_vector[34],
+                                       mmg_params_vector[35], mmg_params_vector[36]])
+        self.Ci            = np.array([mmg_params_vector[37], mmg_params_vector[38], 
+                                        mmg_params_vector[39], mmg_params_vector[40]]) 
+        self.Jmin          =  -0.5 # coeff. from exp
+        self.alpha_p       =  1.5  # coeff. from exp   
+        
+        # Rudder
+        self.t_rudder           = mmg_params_vector[41] 
+        self.ah_rudder          = mmg_params_vector[42]
+        self.xh_rudder_nd       = mmg_params_vector[43]
+        self.lr_rudder_nd       = mmg_params_vector[46]
+        self.kx_rudder          = mmg_params_vector[44]
+        self.kx_rudder_reverse  = mmg_params_vector[49]
+        self.epsilon_rudder     = mmg_params_vector[45]
+        self.cpr_rudder         = mmg_params_vector[50] 
+        self.gammaN             = mmg_params_vector[47]
+        self.gammaP             = mmg_params_vector[48]
+
+        # Wind
+        self.XX0 = mmg_params_vector[59] 
+        self.XX1 = mmg_params_vector[60] 
+        self.XX3 = mmg_params_vector[61] 
+        self.XX5 = mmg_params_vector[62] 
+        self.YY5 = mmg_params_vector[65]
+        self.NN1 = mmg_params_vector[66]  
+        self.NN2 = mmg_params_vector[67]  
+        self.NN3 = mmg_params_vector[68]
+        self.KK1 = 0
+        self.KK2 = 0
+        self.KK3 = 0
+        self.KK5 = 0  
+        # 

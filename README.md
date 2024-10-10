@@ -32,14 +32,6 @@
 
 
 
-## Usage
-
-### installation
-
-ソースコードをダウンロードした後、`shipsim`フォルダを作業ディレクトリに配置してください。
-
-
-
 ### Compilimg `.f90` files
 
 本シミュレータはPythonのみで機能するが、FortranによりMMGモデルの高速化が可能である。しかし、F2pyの仕様上 `.f90` ファイルのコンパイルをあらかじめ行っておく必要があります。
@@ -51,47 +43,15 @@ gfortran -c shipsim/ship/esso_osaka/f2py_mmg/mmg_esso_osaka_verctor_input.f90
 ```
 
 ```bash
-f2py --fcompiler=gnu95 -m mmg_esso -c --f90flags='-O3' shipsim/ship/esso_osaka/f2py_mmg/mmg_esso_osaka_verctor_input.f90
+FC=gfortran f2py -m mmg_esso -c --f90flags='-O3' shipsim/ship/esso_osaka/f2py_mmg/mmg_esso_osaka_verctor_input.f90 --backend meson
 ```
 
 
-
-### Tutorial
-
-[Zigzag test](./tutorial_zigzag.ipynb)と[DP test](./tutorial_vtps.ipynb)のノートブックを用意したので参考にしてください。
-
-
-
-
-
-## Demo
-
-##### Zigzag test of EssoOsaka in Inukai pond (Done by [tutorial_zigzag.ipynb](./tutorial_zigzag.ipynb))
-
-<img src="./log/tutorial_zigzag/test_traj.png" style="zoom:30%;" />
-
-##### Positioning test of Takaoki (Done by [tutorial_vtps.ipynb](./tutorial_vtps.ipynb))
-
-<img src="./log/tutorial_vtps/test_traj.png" style="zoom:30%;" />
-
-
-
 ## Requirement
-- Python 3.9以上（Genetic関数に対応したもの
-- Numpy
+- Python 3.9以下
+- Numpy 2.0以上（f2pyコンパイルに必須）
 - Pandas
 - Matplotlib
 - Scipy
-
-
-
-## Update history
-
-| Version             | Descriptions                                                 |
-| ------------------- | ------------------------------------------------------------ |
-| v0.1 (2023/Jul/27)  | 簡易的にシミュレータを作成した。                             |
-| v1.0.0 (2023/Aug/2) | アクチュエータと船体で状態変数の数値積分方法が異なっていた構造問題を解決した。 <br />複数の船種と港湾を追加した。 |
-| v1.1.0 (2023/Sep/4) | ShipとWorldの切り分け方法を整理し直した。                    |
-| v1.1.1 (2023/Sep/9) | バグ修正（#6,#8,#9）                                         |
-|                     |                                                              |
+- meson（f2pyコンパイルに必須）
 

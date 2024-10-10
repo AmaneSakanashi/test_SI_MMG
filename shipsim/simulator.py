@@ -134,7 +134,7 @@ class ManeuveringSimulation:
 
 
         # @profile
-    def step(self, update_params, action, world_state=None, last_logging=False):
+    def step(self, update_params, action, wind, world_state=None, last_logging=False):
         """simulation step
 
         Args:
@@ -147,17 +147,21 @@ class ManeuveringSimulation:
             dict: Additional infomation
         """
         t, state, observation = self.t, self.state, self.observation
+
         # start loop
         ##### current ##################################################
         # split state
+        # ship_state = state[self.ship_state_idx]
+        # world_state = state[self.world_state_idx]
         ship_state = state[self.ship_state_idx]
         world_state = state[self.world_state_idx]
+
         ##### next #####################################################
         ### time ###
         t_n = t + self.dt_sim
         ### state ###
         # world
-        world_state_n = world_state
+        world_state_n = wind
         # ship
         ship_action = np.concatenate([action, world_state])
         k1 = self.ship.ode_rhs(ship_state, ship_action, update_params)
@@ -169,36 +173,32 @@ class ManeuveringSimulation:
         # concat world and ship state
         state_n = np.concatenate([ship_state_n, world_state_n])
         ### observation ###
-        ship_observation_n = self.ship.observe_state(
-            ship_state_n,
-            np_random=self.np_random,
-        )
-        world_observation_n = self.world.observe_state(
-            world_state_n,
-            np_random=self.np_random,
-        )
-        observation_n = np.concatenate([ship_observation_n, world_observation_n])
+        # ship_observation_n = self.ship.observe_state(
+        #     ship_state_n,
+        #     np_random=self.np_random,
+        # )
+        # world_observation_n = self.world.observe_state(
+        #     world_state_n,
+        #     np_random=self.np_random,
+        # )
+        # observation_n = np.concatenate([ship_observation_n, world_observation_n])
         ### update ###
         t = t_n
-        state, observation = state_n, observation_n
+        # state, observation = state_n, observation_n
+        state = state_n
         ship_state, world_state = ship_state_n, world_state_n
         # logging last state
         # if last_logging:
-        log = (
-            [t]
-            + state.tolist()
-            # + action.tolist()
-            # + observation.tolist()
-            # + [collide]
-        )
+        log = ([t] + state.tolist())
         self.logger.append(log)
         # postprocess for next step
-        self.t, self.state, self.observation = t, state, observation
+        # self.t, self.state, self.observation = t, state, observation
+        self.t, self.state = t, state
 
         # info = {"t": self.t, "state": self.state, "observation": self.observation}
         # print("!!!Calculation COMPLETED!!!")
         # return observation, info
-        return self.t, self.state, self.observation
+        return self.t, self.state
         
         #### Original ver. ########
         
